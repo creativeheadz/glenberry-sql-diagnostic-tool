@@ -45,10 +45,11 @@ class WebServer {
       contentSecurityPolicy: {
         directives: {
           defaultSrc: ["'self'"],
-          styleSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
-          scriptSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
+          styleSrc: ["'self'", "'unsafe-inline'", "data:", "https://cdnjs.cloudflare.com", "https://cdn.jsdelivr.net", "https://cdn.datatables.net"],
+          scriptSrc: ["'self'", "'unsafe-inline'", "data:", "https://cdnjs.cloudflare.com", "https://cdn.jsdelivr.net", "https://cdn.datatables.net", "https://code.jquery.com"],
           imgSrc: ["'self'", "data:", "https:"],
-          connectSrc: ["'self'", "ws:", "wss:"]
+          connectSrc: ["'self'", "ws:", "wss:"],
+          fontSrc: ["'self'", "data:", "https:"]
         }
       }
     }));

@@ -207,6 +207,22 @@ class WebRoutes {
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .report-links .btn-lg {
+            font-size: 1.1rem;
+            padding: 12px 24px;
+        }
+
+        .report-links small {
+            margin-right: 8px;
+            font-weight: normal;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.875rem;
         }
 
         .btn {
@@ -492,16 +508,25 @@ class WebRoutes {
                 </div>
 
                 <div class="report-links">
-                    <h3>📊 View Reports</h3>
+                    <h3>📊 Generated Reports</h3>
                     <div class="button-group">
-                        <a href="/api/reports/\${data.reportId}/export/html" target="_blank" class="btn btn-primary">
+                        <a href="/api/reports/\${data.reportId}/export/html" target="_blank" class="btn btn-primary btn-lg">
                             📄 View HTML Report
                         </a>
-                        <a href="/api/reports/\${data.reportId}/export/csv" class="btn btn-secondary">
+                        <a href="/api/reports/\${data.reportId}" target="_blank" class="btn btn-outline-primary">
+                            🔍 View JSON Data
+                        </a>
+                    </div>
+                    <div class="button-group mt-2">
+                        <small class="text-muted">Download Options:</small>
+                        <a href="/api/reports/\${data.reportId}/export/html?download=true" class="btn btn-sm btn-outline-secondary">
+                            💾 Download HTML
+                        </a>
+                        <a href="/api/reports/\${data.reportId}/export/csv" class="btn btn-sm btn-outline-secondary">
                             📊 Download CSV
                         </a>
-                        <a href="/api/reports/\${data.reportId}" class="btn btn-secondary">
-                            🔍 View JSON Data
+                        <a href="/api/reports/\${data.reportId}/export/json?download=true" class="btn btn-sm btn-outline-secondary">
+                            📋 Download JSON
                         </a>
                     </div>
                 </div>

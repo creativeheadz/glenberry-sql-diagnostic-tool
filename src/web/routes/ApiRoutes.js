@@ -337,7 +337,26 @@ class ApiRoutes {
       if (!latestId) {
         return res.status(404).json({ error: 'No reports found' });
       }
-      await this.handleReportExport(req, res, latestId, 'html');
+
+      const reportPath = path.join(this.config.dataDir, 'reports', `${latestId}.json`);
+      const report = await fs.readJson(reportPath);
+      const reportGenerator = new ReportGenerator(this.config, this.logger);
+
+      // Generate HTML content
+      const htmlContent = reportGenerator.buildHTMLReport(report);
+
+      // Check if download is requested via query parameter
+      const forceDownload = req.query.download === 'true';
+
+      if (forceDownload) {
+        res.setHeader('Content-Type', 'text/html');
+        res.setHeader('Content-Disposition', `attachment; filename="diagnostic-report-latest.html"`);
+      } else {
+        // Serve inline for viewing in browser
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      }
+
+      res.send(htmlContent);
     } catch (error) {
       this.logger.error('Failed to export latest HTML report', error);
       res.status(500).json({ error: 'Failed to export latest HTML report' });
@@ -405,7 +424,30 @@ class ApiRoutes {
   async exportReportHTML(req, res) {
     try {
       const { id } = req.params;
-      await this.handleReportExport(req, res, id, 'html');
+      const reportPath = path.join(this.config.dataDir, 'reports', `${id}.json`);
+
+      if (!await fs.pathExists(reportPath)) {
+        return res.status(404).json({ error: 'Report not found' });
+      }
+
+      const report = await fs.readJson(reportPath);
+      const reportGenerator = new ReportGenerator(this.config, this.logger);
+
+      // Generate HTML content
+      const htmlContent = reportGenerator.buildHTMLReport(report);
+
+      // Check if download is requested via query parameter
+      const forceDownload = req.query.download === 'true';
+
+      if (forceDownload) {
+        res.setHeader('Content-Type', 'text/html');
+        res.setHeader('Content-Disposition', `attachment; filename="diagnostic-report-${id}.html"`);
+      } else {
+        // Serve inline for viewing in browser
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      }
+
+      res.send(htmlContent);
     } catch (error) {
       this.logger.error('Failed to export HTML report', error);
       res.status(500).json({ error: 'Failed to export HTML report' });
@@ -433,8 +475,14 @@ class ApiRoutes {
 
       const report = await fs.readJson(reportPath);
 
+      // Check if download is requested via query parameter
+      const forceDownload = req.query.download === 'true';
+
       res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Content-Disposition', `attachment; filename="diagnostic-report-${id}.json"`);
+      if (forceDownload) {
+        res.setHeader('Content-Disposition', `attachment; filename="diagnostic-report-${id}.json"`);
+      }
+
       res.json(report);
 
     } catch (error) {
