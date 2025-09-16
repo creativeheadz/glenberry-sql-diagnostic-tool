@@ -283,11 +283,13 @@ class ReportGenerator {
                     <div class="summary-card">
                         <div class="card-body">
                             <div class="row">
-                                <div class="col-md-3 text-center">
+                                <div class="col-12 text-center mb-3">
                                     <h5 class="card-title">Server Instance</h5>
                                     <div class="value">${serverInfo.serverName}</div>
                                 </div>
-                                <div class="col-md-9">
+                            </div>
+                            <div class="row">
+                                <div class="col-12">
                                     <h5 class="card-title">Version Information</h5>
                                     <div class="version-details">
                                         <pre class="version-text">${serverInfo.version}</pre>
