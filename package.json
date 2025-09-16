@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
+    "download-queries": "node scripts/download-query-packs.js",
+    "prebuild": "npm run download-queries",
     "build": "npm run build:client && npm run build:server",
     "build:client": "cd client && npm run build",
     "build:server": "pkg package.json --out-path dist/",
@@ -33,6 +35,7 @@
   "dependencies": {
     "axios": "^1.12.2",
     "chalk": "^4.1.2",
+    "cheerio": "^1.1.2",
     "commander": "^11.1.0",
     "compression": "^1.7.4",
     "cors": "^2.8.5",

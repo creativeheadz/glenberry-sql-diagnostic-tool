@@ -41,6 +41,11 @@ Thumbs.db
 data/
 !data/.gitkeep
 
+# Query packs (downloaded during build, but keep directory structure)
+!data/query-packs/
+data/query-packs/*.sql
+data/query-packs/manifest.json
+
 # Temporary
 .tmp/
 .temp/

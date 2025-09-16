@@ -6,8 +6,9 @@ A portable, self-contained SQL Server diagnostic tool that runs Glen Berry's dia
 
 - **🚀 Portable & Self-Contained**: Single executable with built-in web server - no installation required
 - **🌐 Web Interface**: Modern web UI for easy configuration and report viewing
-- **📊 Comprehensive Diagnostics**: Automatically downloads and runs Glen Berry's latest SQL Server diagnostic queries (80+ queries)
-- **🔍 Version Detection**: Automatically detects SQL Server version and runs appropriate queries
+- **📊 Comprehensive Diagnostics**: Uses Glenn Berry's official diagnostic queries from his Dropbox (80+ queries per version)
+- **🔍 Version Detection**: Automatically detects SQL Server version (2005-2025) and uses appropriate query pack
+- **📦 Pre-bundled Query Packs**: All query versions included for offline operation
 - **🤖 AI-Powered Analysis**: Integrates with OpenAI and Ollama for intelligent suggestions and recommendations
 - **📱 Responsive Design**: Works on desktop, tablet, and mobile devices
 - **🔐 Multiple Authentication**: Supports both SQL Server authentication and Windows authentication

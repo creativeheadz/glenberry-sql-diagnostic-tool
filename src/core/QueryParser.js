@@ -1,19 +1,48 @@
 const fs = require('fs-extra');
 const path = require('path');
 const axios = require('axios');
+const cheerio = require('cheerio');
 
 class QueryParser {
-  constructor(logger) {
+  constructor(logger, dataDir = null) {
     this.logger = logger;
     this.queries = [];
     this.sections = new Map();
-    this.glenBerryUrls = {
-      2022: 'https://raw.githubusercontent.com/Ratithoglys/GlennBerry_DMV_Queries/master/2022sql',
-      2019: 'https://raw.githubusercontent.com/Ratithoglys/GlennBerry_DMV_Queries/master/2019.sql',
-      2017: 'https://raw.githubusercontent.com/Ratithoglys/GlennBerry_DMV_Queries/master/2017.sql',
-      2016: 'https://raw.githubusercontent.com/Ratithoglys/GlennBerry_DMV_Queries/master/2016.sql',
-      2014: 'https://raw.githubusercontent.com/Ratithoglys/GlennBerry_DMV_Queries/master/2014.sql',
-      2012: 'https://raw.githubusercontent.com/Ratithoglys/GlennBerry_DMV_Queries/master/2012.sql'
+
+    // Set up paths for pre-downloaded query packs
+    this.dataDir = dataDir || path.join(__dirname, '..', '..', 'data');
+    this.queryPacksDir = path.join(this.dataDir, 'query-packs');
+
+    // Mapping of SQL Server versions to query pack filenames
+    this.queryPackFiles = {
+      2025: 'sql-server-2025-queries.sql',
+      2022: 'sql-server-2022-queries.sql',
+      2019: 'sql-server-2019-queries.sql',
+      2017: 'sql-server-2017-queries.sql',
+      2016: 'sql-server-2016-queries.sql',
+      '2016SP2': 'sql-server-2016SP2-queries.sql',
+      2014: 'sql-server-2014-queries.sql',
+      2012: 'sql-server-2012-queries.sql',
+      2008: 'sql-server-2008-queries.sql',
+      '2008R2': 'sql-server-2008R2-queries.sql',
+      '2008STD': 'sql-server-2008STD-queries.sql',
+      2005: 'sql-server-2005-queries.sql'
+    };
+
+    // Fallback URLs for online download if local files don't exist
+    this.fallbackUrls = {
+      2025: 'https://www.dropbox.com/scl/fi/8qtdi3w5ix2bra8ytk7oy/SQL-Server-2025-Diagnostic-Information-Queries.sql?rlkey=kv1t4fdwe60nkd7fl0jukhnnq&dl=1',
+      2022: 'https://www.dropbox.com/s/6rb2f97ocvkq7fw/SQL%20Server%202022%20Diagnostic%20Information%20Queries.sql?dl=1',
+      2019: 'https://www.dropbox.com/s/k1vauzxxhyh1fnb/SQL%20Server%202019%20Diagnostic%20Information%20Queries.sql?dl=1',
+      2017: 'https://www.dropbox.com/scl/fi/0q4sbb7xb3x3vmbhkdga3/SQL-Server-2017-Diagnostic-Information-Queries.sql?rlkey=nli5q22tgqqw7oxvoqyeujmmc&dl=1',
+      2016: 'https://www.dropbox.com/s/w6gi8j76k64fgbg/SQL%20Server%202016%20SP1%20Diagnostic%20Information%20Queries.sql?dl=1',
+      '2016SP2': 'https://www.dropbox.com/s/pkpxihdkq3odgbj/SQL%20Server%202016%20SP2%20Diagnostic%20Information%20Queries.sql?dl=1',
+      2014: 'https://www.dropbox.com/s/uttp0843e5078vs/SQL%20Server%202014%20Diagnostic%20Information%20Queries.sql?dl=1',
+      2012: 'https://www.dropbox.com/s/3l4yotzedk45xeh/SQL%20Server%202012%20Diagnostic%20Information%20Queries.sql?dl=1',
+      2008: 'https://www.dropbox.com/s/fq6hyw899fe3crv/SQL%20Server%202008%20R2%20Diagnostic%20Information%20Queries.sql?dl=1',
+      '2008R2': 'https://www.dropbox.com/s/fq6hyw899fe3crv/SQL%20Server%202008%20R2%20Diagnostic%20Information%20Queries.sql?dl=1',
+      '2008STD': 'https://www.dropbox.com/s/mjxw1w9tgw7eo6g/SQL%20Server%202008%20Diagnostic%20Information%20Queries.sql?dl=1',
+      2005: 'https://www.dropbox.com/s/3kkskuheyzauih9/SQL%20Server%202005%20Diagnostic%20Information%20Queries.sql?dl=1'
     };
   }
 
@@ -43,37 +72,179 @@ class QueryParser {
 
   async loadGlenBerryQueries(sqlServerVersion) {
     try {
-      // Map version to the closest available version
+      // First try to load from pre-downloaded local files
+      const sqlContent = await this.loadLocalQueryPack(sqlServerVersion);
+
+      if (sqlContent) {
+        this.logger.info(`Loaded Glenn Berry queries from local query pack for SQL Server ${sqlServerVersion}`);
+        return this.parseGlenBerryQueries(sqlContent, sqlServerVersion);
+      }
+
+      // Fallback to online download if local file doesn't exist
+      this.logger.warn(`Local query pack not found for SQL Server ${sqlServerVersion}, attempting online download...`);
+      return await this.downloadAndParseQueries(sqlServerVersion);
+
+    } catch (error) {
+      this.logger.error('Failed to load Glen Berry queries', error);
+      return [];
+    }
+  }
+
+  async loadLocalQueryPack(sqlServerVersion) {
+    try {
       const versionKey = this.mapVersionToKey(sqlServerVersion);
-      const url = this.glenBerryUrls[versionKey];
+      const filename = this.queryPackFiles[versionKey];
+
+      if (!filename) {
+        this.logger.debug(`No query pack filename mapped for SQL Server ${sqlServerVersion}`);
+        return null;
+      }
+
+      const filePath = path.join(this.queryPacksDir, filename);
+
+      // Check if file exists
+      if (!(await fs.pathExists(filePath))) {
+        this.logger.debug(`Query pack file not found: ${filePath}`);
+        return null;
+      }
+
+      // Read the SQL content
+      const sqlContent = await fs.readFile(filePath, 'utf8');
+      this.logger.debug(`Loaded ${Math.round(sqlContent.length / 1024)}KB from ${filename}`);
+
+      return sqlContent;
+
+    } catch (error) {
+      this.logger.warn(`Failed to load local query pack for SQL Server ${sqlServerVersion}:`, error.message);
+      return null;
+    }
+  }
+
+  async downloadAndParseQueries(sqlServerVersion) {
+    try {
+      const versionKey = this.mapVersionToKey(sqlServerVersion);
+      const url = this.fallbackUrls[versionKey];
 
       if (!url) {
-        this.logger.warn(`No Glen Berry queries available for SQL Server ${sqlServerVersion}, using version 2019`);
+        this.logger.warn(`No fallback URL available for SQL Server ${sqlServerVersion}, using version 2019`);
         return await this.loadGlenBerryQueries(2019);
       }
 
-      this.logger.info(`Downloading Glen Berry queries from: ${url}`);
+      this.logger.info(`Downloading Glenn Berry queries from: ${url}`);
 
-      const response = await axios.get(url, { timeout: 30000 });
-      const sqlContent = response.data;
+      const response = await axios.get(url, {
+        timeout: 30000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+      });
 
-      return this.parseGlenBerryQueries(sqlContent, sqlServerVersion);
+      return this.parseGlenBerryQueries(response.data, sqlServerVersion);
 
     } catch (error) {
-      this.logger.error('Failed to download Glen Berry queries', error);
+      this.logger.error('Failed to download Glenn Berry queries online', error);
+
+      // Try to use closest available local version as last resort
+      const fallbackVersion = this.getClosestAvailableVersion(sqlServerVersion);
+      if (fallbackVersion && fallbackVersion !== sqlServerVersion) {
+        this.logger.warn(`Using closest available version: ${fallbackVersion}`);
+        return await this.loadGlenBerryQueries(fallbackVersion);
+      }
+
       return [];
+    }
+  }
+
+  async getAvailableVersions() {
+    try {
+      // Check which query packs are available locally
+      const localVersions = [];
+
+      for (const [version, filename] of Object.entries(this.queryPackFiles)) {
+        const filePath = path.join(this.queryPacksDir, filename);
+        if (await fs.pathExists(filePath)) {
+          localVersions.push(isNaN(version) ? version : parseInt(version));
+        }
+      }
+
+      return localVersions.sort((a, b) => {
+        // Handle string versions (like '2016SP2')
+        const aNum = parseInt(a);
+        const bNum = parseInt(b);
+        return bNum - aNum; // Sort descending
+      });
+
+    } catch (error) {
+      this.logger.warn('Failed to get available versions', error);
+      return [2019]; // Default fallback
+    }
+  }
+
+  getClosestAvailableVersion(targetVersion) {
+    try {
+      const availableVersions = Object.keys(this.queryPackFiles)
+        .filter(key => {
+          const filePath = path.join(this.queryPacksDir, this.queryPackFiles[key]);
+          try {
+            return fs.existsSync(filePath);
+          } catch {
+            return false;
+          }
+        })
+        .map(key => isNaN(key) ? key : parseInt(key))
+        .sort((a, b) => {
+          const aNum = parseInt(a);
+          const bNum = parseInt(b);
+          return bNum - aNum; // Sort descending
+        });
+
+      // Find the closest version that's not newer than target
+      for (const version of availableVersions) {
+        const versionNum = parseInt(version);
+        if (versionNum <= targetVersion) {
+          return version;
+        }
+      }
+
+      // If no older version found, return the oldest available
+      return availableVersions[availableVersions.length - 1];
+    } catch (error) {
+      this.logger.warn('Error finding closest available version', error);
+      return 2019; // Safe fallback
+    }
+  }
+
+  async getQueryPackManifest() {
+    try {
+      const manifestPath = path.join(this.queryPacksDir, 'manifest.json');
+      if (await fs.pathExists(manifestPath)) {
+        return await fs.readJson(manifestPath);
+      }
+      return null;
+    } catch (error) {
+      this.logger.warn('Failed to read query pack manifest', error);
+      return null;
     }
   }
 
   mapVersionToKey(version) {
     const versionNum = parseInt(version);
 
+    // Handle direct year input (e.g., 2022, 2019, etc.)
+    if (versionNum >= 2005 && versionNum <= 2025) {
+      return versionNum;
+    }
+
+    // Handle SQL Server internal version numbers
+    if (versionNum >= 17) return 2025;  // SQL Server 2025 is version 17
     if (versionNum >= 16) return 2022;  // SQL Server 2022 is version 16
     if (versionNum >= 15) return 2019;  // SQL Server 2019 is version 15
     if (versionNum >= 14) return 2017;  // SQL Server 2017 is version 14
     if (versionNum >= 13) return 2016;  // SQL Server 2016 is version 13
     if (versionNum >= 12) return 2014;  // SQL Server 2014 is version 12
     if (versionNum >= 11) return 2012;  // SQL Server 2012 is version 11
+    if (versionNum >= 10) return 2008;  // SQL Server 2008/2008 R2 is version 10
+    if (versionNum >= 9) return 2005;   // SQL Server 2005 is version 9
 
     return 2019; // Default fallback
   }
